@@ -1,0 +1,74 @@
+name: Deploy production database
+run-name: Production ${{ inputs.source_sha }} via harness ${{ inputs.harness_sha }}
+on:
+  workflow_dispatch:
+    inputs:
+      source_sha:
+        description: Full private production commit SHA
+        required: true
+        type: string
+      baseline_sha:
+        description: Full previously deployed commit SHA from reviewed policy
+        required: true
+        type: string
+      harness_sha:
+        description: Full public main commit SHA reviewed for this deployment
+        required: true
+        type: string
+      ci_run_id:
+        description: Successful private production Database validation run ID
+        required: true
+        type: string
+permissions:
+  contents: read
+concurrency:
+  group: justalk-production-database
+  cancel-in-progress: false
+jobs:
+  request:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - name: Validate immutable request and activation prerequisites
+        env:
+          SOURCE_SHA: ${{ inputs.source_sha }}
+          BASELINE_SHA: ${{ inputs.baseline_sha }}
+          HARNESS_SHA: ${{ inputs.harness_sha }}
+          CI_RUN_ID: ${{ inputs.ci_run_id }}
+        run: python3 scripts/harness.py request
+  deploy:
+    needs: request
+    name: Approve source ${{ inputs.source_sha }} and harness ${{ inputs.harness_sha }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    environment:
+      name: supabase-production
+      url: https://github.com/Bandar1011/English-Learning-App/commit/${{ inputs.source_sha }}
+    env:
+      SOURCE_SHA: ${{ inputs.source_sha }}
+      BASELINE_SHA: ${{ inputs.baseline_sha }}
+      HARNESS_SHA: ${{ inputs.harness_sha }}
+      CI_RUN_ID: ${{ inputs.ci_run_id }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: supabase/setup-cli@45a513f8c64c0bc8e0e3dfe572b5c95be85f6359
+        with:
+          version: 2.120.0
+      - name: Fetch exact private revisions and replay in disposable Postgres
+        env:
+          SOURCE_READ_TOKEN: ${{ secrets.SOURCE_READ_TOKEN }}
+        run: python3 scripts/harness.py prepare
+      - name: Revalidate and apply approved migrations
+        env:
+          SOURCE_READ_TOKEN: ${{ secrets.SOURCE_READ_TOKEN }}
+          PRODUCTION_ACCESS_TOKEN: ${{ secrets.PRODUCTION_ACCESS_TOKEN }}
+          PRODUCTION_DB_PASSWORD: ${{ secrets.PRODUCTION_DB_PASSWORD }}
+        run: python3 scripts/harness.py apply
+      - name: Remove ephemeral private workspace
+        if: always()
+        run: python3 scripts/harness.py cleanup
