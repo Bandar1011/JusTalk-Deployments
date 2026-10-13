@@ -67,4 +67,6 @@ Run `python3 -m unittest discover -s tests -p 'test_*.py'`. Tests use synthetic 
 
 Offline tests do not prove live approval gating, GitHub App permissions, private API access, CLI linking, hosted migration replay, or production deployment. Those remain activation checks. No production deployment has been performed by this setup.
 
+The `Harness tests` workflow also replays public synthetic migrations in disposable PostgreSQL. These fixtures are test tooling, not JusTalk's schema. `Rehearse production approval` can test the real environment gate without baseline activation or any secret reference. Run that rehearsal under the restricted requester identity and approve it personally before installing credentials.
+
 Official action pins were checked against the upstream tag refs on 2026-10-13. [Checkout v4.2.2](https://github.com/actions/checkout/tree/11bd71901bbe5b1630ceea73d27597364c9af683) and [Supabase setup-cli v3.0.1](https://github.com/supabase/setup-cli/tree/45a513f8c64c0bc8e0e3dfe572b5c95be85f6359) are pinned by full commit. [Supabase PAT permissions](https://supabase.com/docs/guides/platform/personal-access-tokens) document the CLI linking scopes. [GitHub environment protection](https://docs.github.com/en/actions/reference/workflows-and-actions/deployments-and-environments) governs reviewer and secret release behavior.

@@ -13,3 +13,33 @@ jobs:
         with:
           persist-credentials: false
       - run: python3 -m unittest discover -s tests -p 'test_*.py'
+  replay:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: supabase/setup-cli@45a513f8c64c0bc8e0e3dfe572b5c95be85f6359
+        with:
+          version: 2.120.0
+      - name: Replay synthetic migrations in disposable Postgres
+        run: |
+          python3 - <<'PY'
+          import os, sys, tempfile
+          from pathlib import Path
+          sys.path.insert(0, 'scripts')
+          import harness
+          os.umask(0o077)
+          baseline = {'20261013000001_probe.sql': b'CREATE TABLE public.workflow_probe (value integer NOT NULL);'}
+          candidate = dict(baseline, **{'20261013000002_probe_index.sql': b'CREATE INDEX workflow_probe_value ON public.workflow_probe(value);'})
+          try:
+              with tempfile.TemporaryDirectory() as directory:
+                  work = harness.workspace(Path(directory) / 'database')
+                  harness.need(harness.quiet(['supabase', '--version'], work).strip() == b'2.120.0')
+                  harness.replay(work, baseline, candidate)
+              harness.public_line('REPLAY_PASSED')
+          except Exception:
+              harness.public_line('BLOCKED')
+              sys.exit(1)
+          PY

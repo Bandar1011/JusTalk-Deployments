@@ -1,0 +1,31 @@
+name: Rehearse production approval
+run-name: Approval rehearsal via harness ${{ inputs.harness_sha }}
+on:
+  workflow_dispatch:
+    inputs:
+      harness_sha:
+        description: Full reviewed main commit SHA
+        required: true
+        type: string
+permissions:
+  contents: read
+jobs:
+  request:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Verify rehearsal revision
+        env:
+          EXPECTED_SHA: ${{ inputs.harness_sha }}
+        run: |
+          test "$GITHUB_REF" = refs/heads/main
+          test "$EXPECTED_SHA" = "$GITHUB_SHA"
+          test "$GITHUB_RUN_ATTEMPT" = 1
+  approval:
+    needs: request
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    environment: supabase-production
+    steps:
+      - name: Confirm protected job execution
+        run: echo GATE_REHEARSAL_PASSED
