@@ -144,6 +144,15 @@ class HarnessTest(unittest.TestCase):
         self.assertEqual(result, b'None\nNone\nNone\n')
         self.assertNotIn(sentinel, output.getvalue())
 
+    def test_command_result_excludes_stderr_notices(self):
+        output = io.StringIO()
+        script = "import sys;print('2.120.0');print('CLI_UPDATE_NOTICE', file=sys.stderr)"
+        with tempfile.TemporaryDirectory() as temp, contextlib.redirect_stdout(output), \
+                contextlib.redirect_stderr(output):
+            result = h.quiet([sys.executable, '-c', script], Path(temp))
+        self.assertEqual(result.strip(), h.CLI_VERSION.encode())
+        self.assertEqual(output.getvalue(), '')
+
     def test_main_suppresses_private_exception_tracebacks(self):
         output = io.StringIO()
         with patch.object(sys, 'argv', ['harness.py', 'request']), \
