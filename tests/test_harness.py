@@ -133,7 +133,7 @@ class HarnessTest(unittest.TestCase):
 
     def test_private_subprocess_failure_does_not_leak_or_inherit_credentials(self):
         sentinel = 'PRIVATE_SQL_AND_PASSWORD_SENTINEL'
-        script = "import os,sys;print('" + sentinel + "');print(os.getenv('SOURCE_READ_TOKEN'));sys.exit(9)"
+        script = "import os,sys;print('" + sentinel + "');print('" + sentinel + "', file=sys.stderr);print(os.getenv('SOURCE_READ_TOKEN'));sys.exit(9)"
         output = io.StringIO()
         with tempfile.TemporaryDirectory() as temp, patch.dict(os.environ, {'SOURCE_READ_TOKEN': sentinel,
                 'PRODUCTION_ACCESS_TOKEN': sentinel, 'PGPASSWORD': sentinel, 'SUPABASE_ACCESS_TOKEN': sentinel}), \
@@ -152,6 +152,12 @@ class HarnessTest(unittest.TestCase):
             result = h.quiet([sys.executable, '-c', script], Path(temp))
         self.assertEqual(result.strip(), h.CLI_VERSION.encode())
         self.assertEqual(output.getvalue(), '')
+
+    def test_command_output_limit_includes_both_streams(self):
+        script = "import sys;sys.stdout.write('123456');sys.stderr.write('123456')"
+        with tempfile.TemporaryDirectory() as temp, patch.object(h, 'LIMIT', 10):
+            with self.assertRaises(h.Stop):
+                h.quiet([sys.executable, '-c', script], Path(temp))
 
     def test_main_suppresses_private_exception_tracebacks(self):
         output = io.StringIO()

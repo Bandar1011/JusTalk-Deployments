@@ -194,12 +194,13 @@ def quiet(command, cwd, *, extra_env=None):
                    and key not in {'DATABASE_URL', 'DB_URL', 'SOURCE_READ_TOKEN', 'PRODUCTION_ACCESS_TOKEN',
                                    'PRODUCTION_DB_PASSWORD', 'GITHUB_TOKEN', 'GH_TOKEN'}}
     environment.update(extra_env or {})
-    with tempfile.TemporaryFile() as output:
+    with tempfile.TemporaryFile() as output, tempfile.TemporaryFile() as diagnostics:
         completed = subprocess.run(command, cwd=cwd, env=environment, stdout=output,
-                                   stderr=output, timeout=1800, check=False)
+                                   stderr=diagnostics, timeout=1800, check=False)
         output.seek(0)
         raw = output.read(LIMIT + 1)
-        need(len(raw) <= LIMIT)
+        diagnostics.seek(0, os.SEEK_END)
+        need(len(raw) + diagnostics.tell() <= LIMIT)
         need(completed.returncode == 0)
         return raw
 
